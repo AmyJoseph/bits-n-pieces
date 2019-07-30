@@ -20,8 +20,7 @@ def download_pub(url_to_download, download_folder):
 	It then checks to see whether a file of that name already exists in the download folder, and finishes by logging a warning if it does.
 
 	If the file doesn't already exist, it requests the URL and checks and logs the response code. 
-	If not a 404 or 503 error, it checks the file type in the URL headers and logs a warning if it is just a webpage.
-		*** #TODO: look at replacing the r.status_code checks with r.raise_for_status() ***
+	If not a 4xx or 5xx error, it checks the file type in the URL headers and logs a warning if it is just a webpage.
 
 	If it is not just a webpage, it downloads the file.
 	
@@ -60,10 +59,14 @@ def download_pub(url_to_download, download_folder):
 		# download the file, or log error if file doesn't exist at URL
 			r = requests.get(resolved_url)
 			logging.info("Status code: {}".format(r.status_code))
-			if r.status_code == 404:
-				logging.warning("404 error")
-			elif r.status_code == 503:
-				logging.warning("page unavailable")
+			# if r.status_code == 404:
+			# 	logging.warning("404 error")
+			# elif r.status_code == 503:
+			# 	logging.warning("page unavailable")
+
+			if not r.ok:
+				logging.warning("{} error".format(r.status_code))
+
 			else:
 				# check that you are not attempting to download a webpage
 				if "html" in r.headers['Content-Type']:
@@ -71,9 +74,8 @@ def download_pub(url_to_download, download_folder):
 				else:
 					# write file to folder
 					with open(file_path, 'wb') as f:
-						f.write(r.content)
-					# to test: for chunk in r.iter_content(100000):
-					# 			f.write(chunk)
+						for chunk in r.iter_content(100000):
+							f.write(chunk)
 
 					logging.info("Wrote {}".format(fname))
 					
