@@ -14,7 +14,7 @@ def download_pub(url_to_download, download_folder):
 		url_to_download (str): URL of file to download.
 		download_folder(str): folder where the file should be saved
 
-		Starts by checking whether the given URL redirects to the "true" URL (e.g. for link-shortener URLS like bit.ly).
+	Starts by checking whether the given URL redirects to the "true" URL (e.g. for link-shortener URLS like bit.ly).
 
 	Once it has resolved to the final URL, it parses the URL to find the filename.
 	It then checks to see whether a file of that name already exists in the download folder, and finishes by logging a warning if it does.
@@ -58,11 +58,6 @@ def download_pub(url_to_download, download_folder):
 		if not os.path.exists(file_path):
 		# download the file, or log error if file doesn't exist at URL
 			r = requests.get(resolved_url)
-			logging.info("Status code: {}".format(r.status_code))
-			# if r.status_code == 404:
-			# 	logging.warning("404 error")
-			# elif r.status_code == 503:
-			# 	logging.warning("page unavailable")
 
 			if not r.ok:
 				logging.warning("{} error".format(r.status_code))
