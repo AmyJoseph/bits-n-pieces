@@ -3,12 +3,12 @@
 """
 Module to assist with downloading resources from URLs.
 
-Main class is "DownloadResource", which attempts to download the resource at a given URL, and also returns attributes about the resource.
+Main code is a class called "DownloadResource", which attempts to download the resource at a given URL, and also returns attributes about the resource.
 Assigns filenames by minting a UUID, but also returns original filenames as parsed from headers and/or URL.
 
-There is also a method called "DownloadResource.change_filename" wchich can be run after a resource is downloaded an an object returned. You can use this to change the UUID filename to an alternative of your choosing, including the filename_from_headers or filename_from_url.
-
 Function "download_from_list" takes a list, tuple or set of URLs and passes each one to DownloadResource - will therefore download the resources and return a list with a DownloadResource object from each URL in the original list.
+
+Function "change_filename" can be run after a resource is downloaded and a DownloadObject has been created. You can use this to change the UUID filename to an alternative of your choosing, including the filename_from_headers or filename_from_url.
 
 """
 
@@ -75,7 +75,7 @@ class DownloadResource:
 		
 	"""
 
-	def __init__(self, url, directory, collect_html=False):
+	def __init__(self, url, directory="content", collect_html=False):
 		"""
 		Parameters
 		----------
@@ -90,7 +90,7 @@ class DownloadResource:
 		self.download_status = None
 		self.message = None
 
-		self.dest_dir = directory
+		self.directory = directory
 		self.collect_html = collect_html
 		self.url_original = url
 		self.url_resolved = None
@@ -130,7 +130,6 @@ class DownloadResource:
 		# clean up
 		if hasattr(self, "r"):
 			del self.r
-		del self.dest_dir
 		del self.collect_html
 
 		time.sleep(.5)
@@ -191,9 +190,9 @@ class DownloadResource:
 		"""Downloads the resource, minting a unique filename from a UUID and creating the destination directory first if necessary
 		"""
 
-		if not os.path.exists(self.dest_dir): os.makedirs(self.dest_dir)
+		if not os.path.exists(self.directory): os.makedirs(self.directory)
 		self.filename = str(uuid.uuid4())
-		self.filepath = os.path.join(self.dest_dir, self.filename)
+		self.filepath = os.path.join(self.directory, self.filename)
 
 		with open(self.filepath, 'wb') as f:
 			for chunk in self.r.iter_content(100000):
@@ -247,70 +246,72 @@ class DownloadResource:
 		"""Adds correct file extension as found by EXIFtool to filename 
 		"""
 		if self.filetype_extension != None:
-			new_filepath = os.path.join(self.dest_dir, self.filename + os.extsep + self.filetype_extension.lower())
+			new_filepath = os.path.join(self.directory, self.filename + os.extsep + self.filetype_extension.lower())
 			os.rename(self.filepath, new_filepath)
 			self.filepath = new_filepath
 			self.filename = str(ntpath.basename(self.filepath))
 
-	def change_filename(self, rename_from_headers=False, rename_from_url=False, new_filename=None):
-		"""Run this method over an existing DownloadObject to change the filename to a string of your choosing.
-		All parameters are optional. Only one will be actioned, with priority in the order set out below.
-		Will not rename to the same name as a file already present in the directory - will return with self.renamed = False.
-		...
-		Parameters
-		----------
-		rename_from headers : bool, optional
-			set to True if you want to give the file the same filename originally found in the resource header
-		rename_from_url : bool, optional
-			set to True if you want to give the file the same filename originally found in the URL
-		new_filename : str, optional
-			Pass any filename you like here (including extension)
 
-		Attributes
-		----------
-		filename, filepath : str
-			Set to new values if succsssful
-		renamed : bool
-			True if successful, else False. You could use this to retry with a different parameter if unsuccessful (eg if you set to use headers and there was no filename in the headers originally)
-		"""
-
-		if self.download_status == True:
-			if rename_from_headers == True:
-				new_filename = self.filename_from_headers
-			elif rename_from_url == True:
-				new_filename = self.filename_from_url
-
-			if new_filename == None:
-				logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: no new filename provided")
-				return
-		
-			download_dir = ntpath.dirname(self.filepath)
-			new_filepath = os.path.join(download_dir, new_filename)
-			if not os.path.exists(new_filepath):
-				os.rename(self.filepath, new_filepath)
-				logging.info(f"'{self.filepath}' successfully changed to {new_filename}'")
-				self.filename = new_filename
-				self.filepath = new_filepath
-				self.renamed = True
-			else:
-				logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in {download_dir}")
-		else:
-			logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
-
-	
-
-def download_from_list(urls, download_folder, collect_html=False):
+def download_from_list(urls, destination_directory="content", collect_html=False):
 	"""List comprehension to run DownloadResource over a list of URLs, downloading resources and returning a list of DownloadResource objects
 	...
 	Parameters
 	----------
 	urls : data structure (list, tuple, or set) 
 		Contains the URLs of resources to be downloaded
-	directory : str
+	directory : str, optional. Defaults to /content.
 		Location of destination directory
 	collect_html : bool, optional
 		Set to True if desired behaviour is to download resource if it is just an HTML page. Default is False: download attempt will fail with error message "Target was webpage - deleted"
 	"""
 
-	downloaded_urls = [DownloadResource(x, download_folder, collect_html) for x in urls]
+	downloaded_urls = [DownloadResource(x, destination_directory, collect_html) for x in urls]
 	return downloaded_urls
+
+
+def change_filename(self, rename_from_headers=False, rename_from_url=False, new_filename=None):
+	"""Run this method over an existing DownloadObject to change the filename to a string of your choosing.
+	Requires a DownloadObject. All other parameters are optional; only one will be actioned, with priority in the order set out below.
+	Will not rename to the same name as a file already present in the directory - will return with self.renamed = False.
+	...
+	Parameters
+	----------
+	self : an existing DownloadObject instance
+	rename_from headers : bool, optional
+		set to True if you want to give the file the same filename originally found in the resource header
+	rename_from_url : bool, optional
+		set to True if you want to give the file the same filename originally found in the URL
+	new_filename : str, optional
+		Pass any filename you like here (including extension)
+
+	Attributes
+	----------
+	filename, filepath : str
+		Set to new values if succsssful
+	renamed : bool
+		True if successful, else False. You could use this to retry with a different parameter if unsuccessful (eg if you set to use headers and there was no filename in the headers originally)
+	"""
+
+	if self.download_status == True:
+		if rename_from_headers == True:
+			new_filename = self.filename_from_headers
+		elif rename_from_url == True:
+			new_filename = self.filename_from_url
+
+		if new_filename == None:
+			logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: no new filename provided")
+			return
+	
+		new_filepath = os.path.join(self.directory, new_filename)
+		if not os.path.exists(new_filepath):
+			os.rename(self.filepath, new_filepath)
+			logging.info(f"'{self.filepath}' successfully changed to {new_filename}'")
+			self.filename = new_filename
+			self.filepath = new_filepath
+			self.renamed = True
+		else:
+			logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in {download_dir}")
+	else:
+		logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
+
+	
