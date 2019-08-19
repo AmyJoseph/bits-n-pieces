@@ -12,6 +12,7 @@ Function "change_filename" can be run after a resource is downloaded and a Downl
 
 """
 
+from datetime import datetime
 import exiftool # req
 import hashlib
 import logging
@@ -95,6 +96,7 @@ class DownloadResource:
 		self.url_original = url
 		self.url_resolved = None
 		self.url_final = None
+		self.datetime = None
 
 		self.get_real_download_url()
 
@@ -154,7 +156,8 @@ class DownloadResource:
 			path_url_tuple = url_parsed[:3] + ("","","")
 			self.url_final = urlunparse(path_url_tuple)
 
-			# get the thing!
+			# get the thing, recording the time
+			self.datetime = datetime.datetime.now()
 			self.r = requests.get(self.url_final)
 			self.r.raise_for_status()
 		except requests.exceptions.HTTPError as e:
