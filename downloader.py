@@ -18,6 +18,7 @@ import hashlib
 import logging
 import ntpath
 import os
+import peewee
 import re
 import requests # req
 import time
@@ -76,16 +77,18 @@ class DownloadResource:
 		
 	"""
 
-	def __init__(self, url, directory="content", collect_html=False):
+	def __init__(self, url, directory="content", collect_html=False, proxies=None):
 		"""
 		Parameters
 		----------
 		url : str
 			URL of reseource to be downloaded
-		directory : str
-			Location of destination directory
+		directory : str, optional
+			Location of destination directory. Default is a directory called "content" in the current directory
 		collect_html : bool, optional
 			Set to True if desired behaviour is to download resource if it is just an HTML page. Default is False: download attempt will fail with error message "Target was webpage - deleted"
+		proxies : dict, optional
+			Pass a proxies dictionary if it will be required for requests.
 		"""
 
 		self.download_status = None
@@ -93,6 +96,7 @@ class DownloadResource:
 
 		self.directory = directory
 		self.collect_html = collect_html
+		self.proxies = proxies
 		self.url_original = url
 		self.url_resolved = None
 		self.url_final = None
@@ -146,7 +150,7 @@ class DownloadResource:
 		# check if the URL redirects
 		session = requests.Session()
 		try:
-			response = session.head(url_stripped, allow_redirects=True)
+			response = session.head(url_stripped, allow_redirects=True, proxies=self.proxies)
 			self.url_resolved = response.url
 			
 #***		# EXPERIMENTAL: clean any parameter, query or fragment attributes from end of URL
@@ -157,13 +161,15 @@ class DownloadResource:
 			self.url_final = urlunparse(path_url_tuple)
 
 			# get the thing, recording the time
-			self.datetime = datetime.datetime.now()
-			self.r = requests.get(self.url_final)
+			self.datetime = datetime.now()
+			self.r = requests.get(self.url_final, timeout=(5,14), proxies=self.proxies)
 			self.r.raise_for_status()
 		except requests.exceptions.HTTPError as e:
 			self.download_status = False
 			self.message = f"HTTPError: {self.r.status_code}"
 		except requests.exceptions.ConnectionError as e:
+			print (e)
+			quit()
 			self.download_status = False
 			self.message = f"Connection failed"
 		except requests.exceptions.RequestException as e:
@@ -316,5 +322,4 @@ def change_filename(self, rename_from_headers=False, rename_from_url=False, new_
 			logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in {download_dir}")
 	else:
 		logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
-
 	

@@ -1,6 +1,8 @@
 More testing to see whether trimming everything in URL after path ever breaks anything
 Testing if Content-Disposition regex ever fails
 
+check that the revised request requests "just work" without passing a proxy dict on the network.
+
 Write up requirements including EXIFtool
 Work out how to package / bundle w EXIFtool
 
