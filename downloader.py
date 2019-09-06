@@ -13,12 +13,14 @@ Function "change_filename" can be run after a resource is downloaded and a Downl
 """
 
 from datetime import datetime
+# from downloader_db import Resources
 import exiftool # req
 import hashlib
 import logging
 import ntpath
 import os
 import peewee
+from pprint import pprint
 import re
 import requests # req
 import time
@@ -27,10 +29,38 @@ import uuid
 
 logging.basicConfig(level=logging.INFO)
 
+database_path = 'test_db.db'
+# turn on for testing - will delete the db at the start of each run
+if os.path.exists(database_path):
+	os.remove(database_path)
+database = peewee.SqliteDatabase(database_path)
 
+class Resources(peewee.Model):
+	download_status = peewee.BooleanField(null = True, default = None)
+	message = peewee.CharField(max_length = 300, null = True, default = None)
+	directory = peewee.CharField(max_length = 200, null = True, default = None)
+	url_original = peewee.CharField(max_length = 300)
+	url_resolved = peewee.CharField(max_length = 300, null = True, default = None)
+	url_final = peewee.CharField(max_length = 300, null = True, default = None)
+	datetime = peewee.DateTimeField(null=True, default=None)
+	filename = peewee.CharField(max_length = 100, null=True, default=None)
+	filepath = peewee.CharField(max_length = 300, null=True, default=None)
+	filename_from_url = peewee.CharField(max_length = 100, null=True, default=None)
+	filename_from_headers = peewee.CharField(max_length = 100, null=True, default=None)
+	filetype_extension = peewee.CharField(max_length=25, null=True, default=None)
+	mimetype = peewee.CharField(max_length=40, null=True, default=None)
+	md5 = peewee.CharField(max_length=40, null=True, default=None)
+
+	class Meta:
+		database = database
+
+try:
+	Resources.create_table()
+except peewee.OperationalError:
+	print("This table already exists!")
 
 class DownloadResource:
-	"""Attempts to download the resource at a given URL, and also returns attributes about the resource.
+	"""Attempts to download the resource at a given URL, and also returns attributes about the resource and saves everything to a database.
 	...
 
 	Attributes
@@ -93,14 +123,15 @@ class DownloadResource:
 
 		self.download_status = None
 		self.message = None
-
 		self.directory = directory
 		self.collect_html = collect_html
 		self.proxies = proxies
 		self.url_original = url
 		self.url_resolved = None
 		self.url_final = None
-		self.datetime = None
+				
+		# creates an entry in the Resources table and returns it as "self.id"
+		self.record = Resources.create(url_original = self.url_original)
 
 		self.get_real_download_url()
 
@@ -115,6 +146,8 @@ class DownloadResource:
 		# check file extension is correct if file downloaded and not deleted by collect_html flag setting
 		if self.download_status == True:
 			self.add_file_extension()
+
+			pprint (self.record.__dict__['__data__'])
 
 		# log outcome
 			if self.mimetype == None:
@@ -137,6 +170,7 @@ class DownloadResource:
 		if hasattr(self, "r"):
 			del self.r
 		del self.collect_html
+		del self.proxies
 
 		time.sleep(.5)
 
@@ -160,8 +194,15 @@ class DownloadResource:
 			path_url_tuple = url_parsed[:3] + ("","","")
 			self.url_final = urlunparse(path_url_tuple)
 
+			self.record.url_resolved = self.url_resolved
+			self.record.url_final = self.url_final
+			self.record.save()
+
+
 			# get the thing, recording the time
-			self.datetime = datetime.now()
+			self.record.datetime = datetime.now()
+			self.record.save()
+
 			self.r = requests.get(self.url_final, timeout=(5,14), proxies=self.proxies)
 			self.r.raise_for_status()
 		except requests.exceptions.HTTPError as e:
@@ -169,31 +210,36 @@ class DownloadResource:
 			self.message = f"HTTPError: {self.r.status_code}"
 		except requests.exceptions.ConnectionError as e:
 			print (e)
-			quit()
 			self.download_status = False
 			self.message = f"Connection failed"
 		except requests.exceptions.RequestException as e:
 			self.download_status = False
 			self.message = f"RequestException: {e}"
 
+		self.record.download_status = self.download_status
+		self.record.message = self.message
+		self.record.save()
+
 	def get_original_filename_from_url(self):
 		"""grabs the bit of the url after the last "/"
 		"""
-		self.filename_from_url = os.path.split(self.url_final)[-1]
+		self.record.filename_from_url = os.path.split(self.url_final)[-1]
+		self.record.save()
 
 	def get_original_filename_from_request_headers(self):
 		"""Uses a regex to find the filename in URL headers['Content-Disposition'] if it exists
 		"""
 
 #***		# THIS WILL NEED A LOT MORE ROBUST TESTING!
-		self.filename_from_headers = None
 		if 'Content-Disposition' in self.r.headers:
 			regex = '(?<=filename=")(.*)(?=")'
 			m = re.search(regex, self.r.headers['Content-Disposition'])
 			if m:
-				self.filename_from_headers = m.group(1)
+				self.record.filename_from_headers = m.group(1)
 			else:
 				self.message = "'Content-Disposition' exists in headers but failed to parse filename"
+				self.record.message = self.message
+			self.record.save()
 
 	def download_file(self):
 		"""Downloads the resource, minting a unique filename from a UUID and creating the destination directory first if necessary
@@ -208,12 +254,17 @@ class DownloadResource:
 				f.write(chunk)
 		self.download_status = True
 
+		self.record.download_status = self.download_status
+		self.record.filename = self.filename
+		self.record.directory = self.directory
+		self.record.filepath = self.filepath
+		self.record.save()
+
 	def get_file_metadata(self):
 		"""Uses EXIFtool to get file extension and MIMEtype, then gets md5 hash
 		"""
 
 #***	# TODO: put exiftool.exe somewhere where it doesn't need the full path
-#***	# TODO: exception handling if EXIFtool doesn't recognise file
 		with exiftool.ExifTool() as et:
 			metadata = et.get_metadata(self.filepath)
 
@@ -222,12 +273,20 @@ class DownloadResource:
 			if 'File:MIMEType' in metadata:
 				if metadata['File:MIMEType'] == "text/html":
 					os.remove(self.filepath)
+
 					self.download_status = False
 					self.message = "Target was webpage - deleted"
+
+					self.record.directory, self.record.filename, self.record.filepath = None, None, None
+					self.record.download_status = self.download_status
+					self.record.message = self.message
+					self.record.save()
+					pprint (self.record.__dict__['__data__'])
+
+					del self.directory
 					del self.filename
-					del self.filename_from_headers
-					del self.filename_from_url
 					del self.filepath
+					
 					return
 
 		if 'ExifTool:Error' in metadata:
@@ -235,6 +294,9 @@ class DownloadResource:
 				self.message = "Unknown filetype"
 			else:
 				self.message = f"{message} ; Unknown filetype"
+
+			self.record.message = self.message
+			self.record.save()
 
 		if 'File:FileTypeExtension' in metadata:
 			self.filetype_extension = metadata['File:FileTypeExtension']
@@ -245,11 +307,15 @@ class DownloadResource:
 		else:
 			self.mimetype = None
 
+			self.record.filetype_extension = self.filetype_extension
+			self.record.mimetype = self.mimetype
+			self.record.save()
+
 		hash_md5 = hashlib.md5()
 		with open(self.filepath, "rb") as f:
 			for chunk in iter(lambda: f.read(4096), b""):
 				hash_md5.update(chunk)
-		self.md5 = hash_md5.hexdigest()
+		self.record.md5 = hash_md5.hexdigest()
 
 	def add_file_extension(self):
 		"""Adds correct file extension as found by EXIFtool to filename 
@@ -260,6 +326,9 @@ class DownloadResource:
 			self.filepath = new_filepath
 			self.filename = str(ntpath.basename(self.filepath))
 
+			self.record.filepath = self.filepath
+			self.record.filename = self.filename
+			self.record.save()
 
 def download_from_list(urls, destination_directory="content", collect_html=False):
 	"""List comprehension to run DownloadResource over a list of URLs, downloading resources and returning a list of DownloadResource objects
