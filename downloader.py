@@ -2,25 +2,28 @@
 
 """
 Module to assist with downloading resources from URLs.
+NB: When reading the help documentation, you may find it easiest to skip over the whole "class Resources(peewee.Model)" section and pick it back up again at FUNCTIONS.
 
-Main code is a class called "DownloadResource", which attempts to download the resource at a given URL, and also returns attributes about the resource.
+Main code is a class called "DownloadResource", which attempts to download the resource at a given URL, and also writes an entry to a database about the resource.
 Assigns filenames by minting a UUID, but also returns original filenames as parsed from headers and/or URL.
 
-Function "download_from_list" takes a list, tuple or set of URLs and passes each one to DownloadResource - will therefore download the resources and return a list with a DownloadResource object from each URL in the original list.
+Function "download_file_from_url" runs a single URL through Download Resource, downloads the resource and downloads the new database ID for it.
+
+Function "download_from_list" takes a list, tuple or set of URLs and passes each one to DownloadResource - downloads the resources and returns a list of dictionaries with each original url and its new database ID.
+
+You may wish to first run "start_database" if you want to provide a path for your database, and/or to reset the database before downloading anything (eg for testing).
 
 Function "change_filename" can be run after a resource is downloaded and a DownloadObject has been created. You can use this to change the UUID filename to an alternative of your choosing, including the filename_from_headers or filename_from_url.
 
 """
 
 from datetime import datetime
-# from downloader_db import Resources
 import exiftool # req
 import hashlib
 import logging
 import ntpath
 import os
 import peewee
-from pprint import pprint
 import re
 import requests # req
 import time
@@ -28,14 +31,14 @@ from urllib.parse import urlparse, urlunparse
 import uuid
 
 logging.basicConfig(level=logging.INFO)
-
-database_path = 'test_db.db'
-# turn on for testing - will delete the db at the start of each run
-if os.path.exists(database_path):
-	os.remove(database_path)
-database = peewee.SqliteDatabase(database_path)
+# defer initialisation of the db until the path is given by user
+# see http://docs.peewee-orm.com/en/latest/peewee/database.html#run-time-database-configuration
+database = peewee.SqliteDatabase(None)
 
 class Resources(peewee.Model):
+	"""Creates the table for the database
+	"""
+
 	download_status = peewee.BooleanField(null = True, default = None)
 	message = peewee.CharField(max_length = 300, null = True, default = None)
 	directory = peewee.CharField(max_length = 200, null = True, default = None)
@@ -54,16 +57,11 @@ class Resources(peewee.Model):
 	class Meta:
 		database = database
 
-try:
-	Resources.create_table()
-except peewee.OperationalError:
-	print("This table already exists!")
-
 class DownloadResource:
-	"""Attempts to download the resource at a given URL, and also returns attributes about the resource and saves everything to a database.
+	"""Attempts to download the resource at a given URL, and also writes attributes about the resource to a database.
 	...
 
-	Attributes
+	Database fields
 	----------
 		download_status : bool
 			True if resource successfully downloaded, else False
@@ -76,6 +74,9 @@ class DownloadResource:
 			The URL after any redirects have been resolved
 		url_final : str
 			The final URL that will be downloaded. Has been cleaned of any parameters, queries or fragments after URL path
+
+		datetime : datetime object
+			The time the resource was requested from url_final
 
 		filename : str
 			Filename of the downloaded file
@@ -107,7 +108,7 @@ class DownloadResource:
 		
 	"""
 
-	def __init__(self, url, directory="content", collect_html=False, proxies=None):
+	def __init__(self, url, directory, collect_html, proxies):
 		"""
 		Parameters
 		----------
@@ -127,10 +128,9 @@ class DownloadResource:
 		self.collect_html = collect_html
 		self.proxies = proxies
 		self.url_original = url
-		self.url_resolved = None
 		self.url_final = None
 				
-		# creates an entry in the Resources table and returns it as "self.id"
+		# creates an entry in the Resources table and returns it as "self.record"
 		self.record = Resources.create(url_original = self.url_original)
 
 		self.get_real_download_url()
@@ -146,8 +146,6 @@ class DownloadResource:
 		# check file extension is correct if file downloaded and not deleted by collect_html flag setting
 		if self.download_status == True:
 			self.add_file_extension()
-
-			pprint (self.record.__dict__['__data__'])
 
 		# log outcome
 			if self.mimetype == None:
@@ -166,14 +164,9 @@ class DownloadResource:
 		else:
 			logging.warning(f"{self.url_original} NO STATUS SET.")
 			
-		# clean up
-		if hasattr(self, "r"):
-			del self.r
-		del self.collect_html
-		del self.proxies
-
 		time.sleep(.5)
 
+		
 # ***METHODS***
 
 	def get_real_download_url(self):
@@ -185,24 +178,18 @@ class DownloadResource:
 		session = requests.Session()
 		try:
 			response = session.head(url_stripped, allow_redirects=True, proxies=self.proxies)
-			self.url_resolved = response.url
+			self.record.url_resolved = response.url
 			
-#***		# EXPERIMENTAL: clean any parameter, query or fragment attributes from end of URL
-			# IS THIS GOING TO MAKE ANYTHING FALL OVER?!
-			url_parsed = urlparse(self.url_resolved)
+#***	EXPERIMENTAL: clean any parameter, query or fragment attributes from end of URL. IS THIS GOING TO MAKE ANYTHING FALL OVER?!
+			url_parsed = urlparse(response.url)
 			# replace any parameters, queries or fragments with empty strings in order to rebuild the URL without them
 			path_url_tuple = url_parsed[:3] + ("","","")
 			self.url_final = urlunparse(path_url_tuple)
-
-			self.record.url_resolved = self.url_resolved
-			self.record.url_final = self.url_final
-			self.record.save()
-
-
+			self.record.url_final = urlunparse(path_url_tuple)
+		
 			# get the thing, recording the time
 			self.record.datetime = datetime.now()
-			self.record.save()
-
+			
 			self.r = requests.get(self.url_final, timeout=(5,14), proxies=self.proxies)
 			self.r.raise_for_status()
 		except requests.exceptions.HTTPError as e:
@@ -229,7 +216,6 @@ class DownloadResource:
 	def get_original_filename_from_request_headers(self):
 		"""Uses a regex to find the filename in URL headers['Content-Disposition'] if it exists
 		"""
-
 #***		# THIS WILL NEED A LOT MORE ROBUST TESTING!
 		if 'Content-Disposition' in self.r.headers:
 			regex = '(?<=filename=")(.*)(?=")'
@@ -277,16 +263,11 @@ class DownloadResource:
 					self.download_status = False
 					self.message = "Target was webpage - deleted"
 
+					# get rid of some of the fields written to the db as now longer relevent
 					self.record.directory, self.record.filename, self.record.filepath = None, None, None
 					self.record.download_status = self.download_status
 					self.record.message = self.message
-					self.record.save()
-					pprint (self.record.__dict__['__data__'])
-
-					del self.directory
-					del self.filename
-					del self.filepath
-					
+					self.record.save()					
 					return
 
 		if 'ExifTool:Error' in metadata:
@@ -296,8 +277,7 @@ class DownloadResource:
 				self.message = f"{message} ; Unknown filetype"
 
 			self.record.message = self.message
-			self.record.save()
-
+			
 		if 'File:FileTypeExtension' in metadata:
 			self.filetype_extension = metadata['File:FileTypeExtension']
 		else: 
@@ -309,7 +289,6 @@ class DownloadResource:
 
 			self.record.filetype_extension = self.filetype_extension
 			self.record.mimetype = self.mimetype
-			self.record.save()
 
 		hash_md5 = hashlib.md5()
 		with open(self.filepath, "rb") as f:
@@ -317,21 +296,22 @@ class DownloadResource:
 				hash_md5.update(chunk)
 		self.record.md5 = hash_md5.hexdigest()
 
+		self.record.save()
+
 	def add_file_extension(self):
 		"""Adds correct file extension as found by EXIFtool to filename 
 		"""
 		if self.filetype_extension != None:
 			new_filepath = os.path.join(self.directory, self.filename + os.extsep + self.filetype_extension.lower())
 			os.rename(self.filepath, new_filepath)
-			self.filepath = new_filepath
-			self.filename = str(ntpath.basename(self.filepath))
+			self.record.filepath = new_filepath
+			self.record.filename = str(ntpath.basename(self.filepath))
 
-			self.record.filepath = self.filepath
-			self.record.filename = self.filename
 			self.record.save()
 
-def download_from_list(urls, destination_directory="content", collect_html=False):
-	"""List comprehension to run DownloadResource over a list of URLs, downloading resources and returning a list of DownloadResource objects
+def download_from_list(urls, directory="content", collect_html=False, proxies=None):
+	"""Run DownloadResource over a list of URLs, downloading resources and returning a list of dictionaries of URLs and their database IDs.
+	If you haven't already started a database it will use the default behaviour of using "files_from_urls.db" in current directory as the database, and adding new files if that db already exists, not resetting it.
 	...
 	Parameters
 	----------
@@ -341,13 +321,27 @@ def download_from_list(urls, destination_directory="content", collect_html=False
 		Location of destination directory
 	collect_html : bool, optional
 		Set to True if desired behaviour is to download resource if it is just an HTML page. Default is False: download attempt will fail with error message "Target was webpage - deleted"
+	proxies : dict, optional
+		Pass a proxies dictionary if it will be required for requests.
 	"""
-
-	downloaded_urls = [DownloadResource(x, destination_directory, collect_html) for x in urls]
-	return downloaded_urls
-
+	resources_list = []
+	for url in urls:
+		try:
+			resource = DownloadResource(url, directory, collect_html, proxies)
+		# start the default database if user hasn't already started one
+		except peewee.InterfaceError:
+			logging.warning("No database started - will add download to default database 'files_from_urls.db'. You can change this behaviour by calling 'downloader.start_database'.")
+			start_database()
+			resource = DownloadResource(url, directory, collect_html, proxies)
+		# make dictionary of original url and id to return
+		resource_dict = {
+		'url_original' : resource.record.url_original,
+		'id' : resource.record.id}
+		resources_list.append(resource_dict)
+	return resources_lisT
 
 def change_filename(self, rename_from_headers=False, rename_from_url=False, new_filename=None):
+	# TODO REPLACE THIS
 	"""Run this method over an existing DownloadObject to change the filename to a string of your choosing.
 	Requires a DownloadObject. All other parameters are optional; only one will be actioned, with priority in the order set out below.
 	Will not rename to the same name as a file already present in the directory - will return with self.renamed = False.
@@ -391,4 +385,60 @@ def change_filename(self, rename_from_headers=False, rename_from_url=False, new_
 			logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in {download_dir}")
 	else:
 		logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
-	
+
+def start_database(database_path="files_from_urls.db", reset_db=False):
+	"""Starts tbe database to be used by DownloadResource.
+	...
+	Parameters
+	----------
+	database_path : str, optional
+		Desired name of database. Can be a path or just a filename. If just a filename, db will be created in the current directory. If none given, defaults to "files_from_urls.db" in current directory.
+	reset_db : bool, optional
+		set to True if you want to use the name of a database that may already exist and you want to overwrite it. Mainly for testing purposes. Default is 'False', so using the name of an existing db will add new entries to the existing db.	
+	"""	
+	# if reset_db = True then any existing db of that name will be deleted
+	if os.path.exists(database_path):
+		if reset_db == True:
+			os.remove(database_path)
+			logging.warning(f"'{database_path}' existed - has been reset")
+		else:
+			logging.info (f"Downloader will add your new files to existing database '{database_path}'")
+
+	# created desired directory location for db if it doesn't already exist
+	database_directory = os.path.split(database_path)[0]
+	if not database_directory == "":
+		if not os.path.exists(database_directory):
+			os.makedirs(database_directory)
+
+	# initialise db and make the Resources table
+	database.init(database_path)
+	try:
+		Resources.create_table()
+	except peewee.OperationalError:
+		print("This table already exists!")
+
+def download_file_from_url(url, directory="content", collect_html=False, proxies=None):
+	"""Run DownloadResource on a single URL, downloading the resource and returning its newly-minted database ID.
+	If you haven't already started a database it will use the default behaviour of using "files_from_urls.db" in current directory as the database, and adding new files if that db already exists, not resetting it.
+	...
+	Parameters
+	----------
+	url : str 
+		URLs of the resource to be downloaded
+	directory : str, optional.
+		Location of destination directory. Defaults to '/content'.
+	collect_html : bool, optional
+		Set to True if desired behaviour is to download resource if it is just an HTML page. Default is False: download attempt will fail with error message "Target was webpage - deleted"
+	proxies : dict, optional
+		Pass a proxies dictionary if it will be required for requests.
+	"""
+
+	try:
+		target_resource = DownloadResource(url, directory, collect_html, proxies)
+	# start the default database if user hasn't already started one
+	except peewee.InterfaceError:
+		logging.warning("No database started - will add download to default database 'files_from_urls.db'. You can change this behaviour by calling 'downloader.start_database'.")
+		start_database()
+	target_resource = DownloadResource(url, directory, collect_html, proxies)
+	# return the new database id for the resource
+	return target_resource.record.id
