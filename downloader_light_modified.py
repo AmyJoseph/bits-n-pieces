@@ -88,6 +88,7 @@ class DownloadResource:
 		self.size_original = None
 		self.filesize = None
 		self.md5_original = None
+		self.exists = False
 		self.jhove_check = False
 #________________________________________________________________________
 
@@ -362,6 +363,7 @@ class DownloadResource:
 				return
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			self.new_filepath = os.path.join(self.directory, self.new_filename)
+			print(self.new_filepath)
 			if not os.path.exists(self.new_filepath):
 				os.rename(self.filepath, self.new_filepath)
 				logging.info(f"'{self.filepath}' successfully changed to {self.new_filename}'")
@@ -370,6 +372,7 @@ class DownloadResource:
 				self.renamed = True
 #___________________________________________________________________________________________________________________________________________________________________
 			else:
+				print("already here")
 				self.exists = True
 				logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in '{self.directory}'")
 		else:
@@ -387,8 +390,8 @@ class DownloadResource:
 					self.jhove_check =  True
 
 def example():
-	url = r"https://media.acast.com/business-is-boring/howstacygreggwentfromfashionjournalisttobestsellingchildrensbookauthor/media.mp3"
-	directory = os.getcwd()
+	url = r"http://pkp.sfu.ca/ojs/download/ojs-3.2.0.tar.gz"
+	directory = r'D:\\test'
 	target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
 	dictionary = target_resource.output_as_dictionary()
 	for element in dictionary.keys():
