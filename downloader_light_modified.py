@@ -361,8 +361,8 @@ class DownloadResource:
 				self.new_filename = self.filename_from_headers
 			elif rename_from_url == True:
 				self.new_filename = self.filename_from_url#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			elif different_name:
-				self.new_filename =different_name
+			elif custom_name:
+				self.new_filename =custom_name
 			if self.new_filename == None:
 				logging.warning("Could not change filename of '{self.filename}' from {self.url_original}: no new filename provided")
 				return
