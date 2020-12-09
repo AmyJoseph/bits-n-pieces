@@ -75,6 +75,7 @@ class DownloadResource:
 		self.collect_html = collect_html
 		self.proxies = proxies
 		self.url_original = url
+		print(url)
 		self.url_final = None
 		self.filename_from_headers = None
 		self.download_status = None
@@ -94,17 +95,17 @@ class DownloadResource:
 
 				
 		# creates an entry in the Resources table and returns it as "self.record"
-		print("here0")
+		#print("here0")
 
 		self.get_real_download_url()
 
 
 		# continue if no error with requesting URL
 		if self.download_status != False:
-			print("here13")
+			#print("here13")
 
 			self.get_original_filename_from_url()
-			print("here14")
+			#print("here14")
 			self.get_original_filename_from_request_headers()
 			self.get_original_size_from_headers()
 			self.get_original_md5_check_from_headers()
@@ -123,7 +124,7 @@ class DownloadResource:
 			if self.message is not None:
 				logging.info(self.message)
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			if self.filesize and (self.filesize!= int(self.size_original)):
+			if self.filesize and (self.filesize!= self.size_original):
 				logging.warning(f"{self.filesize}: Size of file is not equal to original.{self.size_original}")
 				self.download_status = False
 #__________________________________________________________________________________________________________________________________________
@@ -163,24 +164,24 @@ class DownloadResource:
 		headers = {'User-Agent': user_agent}
 
 		session = requests.Session()
-		print("here1")
+		#print("here1")
 		# set proxies for the session if needed
 		if self.proxies != None:
 						session.proxies.update(self.proxies)
 
 		url_stripped = self.url_original.strip().rstrip("/")
-		print("	here2")
+		#print("	here2")
 		# check if the URL redirects
 		try:
-			print("here3")
+			#print("here3")
 			cookies = None
 			response = session.head(url_stripped, allow_redirects=True)
-			print("here4")
+			#print("here4")
 			# if it encounters a 302 response in the redirect chain, save the cookie
 			if response.history:
-				print("here5")
+				#print("here5")
 				for resp in response.history:
-					print("here6")
+					#print("here6")
 					if resp.status_code == 302:
 						cookies = resp.cookies
 				# request the final url again with the cookie
@@ -188,31 +189,31 @@ class DownloadResource:
 
 			self.url_final = response.url
 
-			print("here 7")
+			#print("here 7")
 															
 			# get the thing, recording the time
 			self.datetime = datetime.now()
-			print("here8")
+			#print("here8")
 			self.r = requests.get(self.url_final, timeout=(5,14), cookies= cookies, headers=headers)
 
-			print("here9")
+			#print("here9")
 
-			print(self.r.status_code)
+			#print(self.r.status_code)
 			
 			self.r.raise_for_status()
 
 		except requests.exceptions.HTTPError as e:
-			print(str(e))
-			print("here10")
+			#print(str(e))
+			#print("here10")
 			self.download_status = False
 			self.message = f"HTTPError: {self.r.status_code}"
 		except requests.exceptions.ConnectionError as e:
-			print (e)
-			print("here11")
+			#print (e)
+			#print("here11")
 			self.download_status = False
 			self.message = f"Connection failed"
 		except requests.exceptions.RequestException as e:
-			print("here12")
+			#print("here12")
 			self.download_status = False
 			self.message = f"RequestException: {e}"
 
@@ -242,8 +243,8 @@ class DownloadResource:
 		"""Gets filesize from URL headers['Content-Length'] if it exists
 		"""
 		if 'Content-Length' in self.r.headers:
-			self.size_original = self.r.headers.get('Content-Length')
-
+			self.size_original = int(self.r.headers.get('Content-Length'))
+			
 
 	def get_original_md5_check_from_headers(self):
 
@@ -274,8 +275,8 @@ class DownloadResource:
 		with exiftool.ExifTool() as et:
 			metadata = et.get_metadata(self.filepath)
 
-		print(metadata)
-		print('File:FileSize' in metadata)
+		#print(metadata)
+		#print('File:FileSize' in metadata)
 		# if discarding html pages, this happens here
 		if self.collect_html == False:
 			if 'File:MIMEType' in metadata:
@@ -294,7 +295,7 @@ class DownloadResource:
 				self.message = "Unknown filetype"
 			else:
 				self.message = "{message} ; Unknown filetype"		
-			
+		# print("'File:FileSize' in metadata")
 		if 'File:FileTypeExtension' in metadata:
 			self.filetype_extension = metadata['File:FileTypeExtension']
 		else: 
@@ -304,9 +305,12 @@ class DownloadResource:
 		else:
 			self.mimetype = None
 		if 'File:FileSize' in metadata:
-			print("'File:FileSize' in metadata")
+			
 			self.filesize = metadata['File:FileSize']
-			print(self.filesize)
+			# print(self.filesize)
+			# print(type(self.filesize))
+			# print("!!!!!!!!!!!!!!!!!!!!!")
+
 		else:
 			self.filesize = None
 		hash_md5 = hashlib.md5()
@@ -328,7 +332,7 @@ class DownloadResource:
 
 
 
-	def change_filename(self, rename_from_headers=False, rename_from_url=False, new_filename=None):
+	def change_filename(self, rename_from_headers=False, rename_from_url=False, new_filename=None, custom_name=None):
 		# TODO REPLACE THIS
 		"""Run this method over an existing DownloadObject to change the filename to a string of your choosing.
 		Requires a DownloadObject. All other parameters are optional; only one will be actioned, with priority in the order set out below.
@@ -351,19 +355,20 @@ class DownloadResource:
 		renamed : bool
 			True if successful, else False. You could use this to retry with a different parameter if unsuccessful (eg if you set to use headers and there was no filename in the headers originally)
 		"""
-		print("Renaming")
+		#print("Renaming")
 		if self.download_status == True:
 			if rename_from_headers == True:
 				self.new_filename = self.filename_from_headers
 			elif rename_from_url == True:
-				self.new_filename = self.filename_from_url
-
+				self.new_filename = self.filename_from_url#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			elif different_name:
+				self.new_filename =different_name
 			if self.new_filename == None:
 				logging.warning("Could not change filename of '{self.filename}' from {self.url_original}: no new filename provided")
 				return
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			self.new_filepath = os.path.join(self.directory, self.new_filename)
-			print(self.new_filepath)
+			#print(self.new_filepath)
 			if not os.path.exists(self.new_filepath):
 				os.rename(self.filepath, self.new_filepath)
 				logging.info(f"'{self.filepath}' successfully changed to {self.new_filename}'")
@@ -372,7 +377,7 @@ class DownloadResource:
 				self.renamed = True
 #___________________________________________________________________________________________________________________________________________________________________
 			else:
-				print("already here")
+				#print("already here")
 				self.exists = True
 				logging.warning(f"Could not change filename of '{self.filename}' from {self.url_original}: new name '{new_filename}' already exists in '{self.directory}'")
 		else:
@@ -390,15 +395,19 @@ class DownloadResource:
 					self.jhove_check =  True
 
 def example():
-	url = r"http://pkp.sfu.ca/ojs/download/ojs-3.2.0.tar.gz"
-	directory = r'D:\\test'
-	target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
-	dictionary = target_resource.output_as_dictionary()
-	for element in dictionary.keys():
-		#print(element)
-		print(f"{element}:{dictionary[element]}")
-	# if 'filename_from_url' in dictionary.keys():
-	# 		target_resource.change_filename(rename_from_url = True)
+	directory = r'D:\test1'
+	#url = r"https://sphinx.acast.com/how-to-save-the-world-podcast/bonus-beyondthebanks/media.mp3"
+	urls = ["https://sphinx.acast.com/advanced-analytics-nba/ourperfectlytimednbafinalspod-/media.mp3",'https://sphinx.acast.com/advanced-analytics-nba/endofseasonsurveyresults-/media.mp3']
+	urls = ["https://scontent.fwlg3-1.fna.fbcdn.net/v/t1.0-9/90949991_2845764652183721_6421251672621711360_n.jpg?_nc_cat=104&cb=846ca55b-ee17756f&ccb=2&_nc_sid=e3f864&_nc_ohc=aFMZ6M1NAJcAX9Mvbyq&_nc_ht=scontent.fwlg3-1.fna&oh=68c561bd7a7029b65182c8eeed96e1f8&oe=5FEEB774"]
+	for url in urls:
+		target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
+		target_resource.change_filename(rename_from_headers=True)
+		dictionary = target_resource.output_as_dictionary()
+		for element in dictionary.keys():
+			#print(element)
+			print(f"{element}:{dictionary[element]}")
+		# if 'filename_from_url' in dictionary.keys():
+		# 		target_resource.change_filename(rename_from_url = True)
 
 
 #_____________________________________________________________________________________________________________________________________________________________________________________________
