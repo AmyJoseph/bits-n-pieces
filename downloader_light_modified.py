@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+
 """
 Module to assist with downloading resources from URLs.
 NB: When reading the help documentation, you may find it easiest to skip over the whole "class Resources(peewee.Model)" section and pick it back up again at FUNCTIONS.
@@ -75,7 +76,6 @@ class DownloadResource:
 		self.collect_html = collect_html
 		self.proxies = proxies
 		self.url_original = url
-		print(url)
 		self.url_final = None
 		self.filename_from_headers = None
 		self.download_status = None
@@ -124,7 +124,7 @@ class DownloadResource:
 			if self.message is not None:
 				logging.info(self.message)
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			if self.filesize and (self.filesize!= self.size_original):
+			if self.filesize and self.size_original and (self.filesize!= self.size_original):
 				logging.warning(f"{self.filesize}: Size of file is not equal to original.{self.size_original}")
 				self.download_status = False
 #__________________________________________________________________________________________________________________________________________
@@ -384,8 +384,9 @@ class DownloadResource:
 			logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	def jhove_check(self):
-
+		print(self.filepath)
 		command = [r'jhove',self.filepath,'-t', 'text'] # the shell command
+		print(command)
 		process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 		output, error = process.communicate()
 		output = str(output).split(r"\r\n")[1:-1]
@@ -395,17 +396,16 @@ class DownloadResource:
 					self.jhove_check =  True
 
 def example():
-	directory = r'D:\test1'
-	#url = r"https://sphinx.acast.com/how-to-save-the-world-podcast/bonus-beyondthebanks/media.mp3"
-	urls = ["https://sphinx.acast.com/advanced-analytics-nba/ourperfectlytimednbafinalspod-/media.mp3",'https://sphinx.acast.com/advanced-analytics-nba/endofseasonsurveyresults-/media.mp3']
-	urls = ["https://scontent.fwlg3-1.fna.fbcdn.net/v/t1.0-9/90949991_2845764652183721_6421251672621711360_n.jpg?_nc_cat=104&cb=846ca55b-ee17756f&ccb=2&_nc_sid=e3f864&_nc_ohc=aFMZ6M1NAJcAX9Mvbyq&_nc_ht=scontent.fwlg3-1.fna&oh=68c561bd7a7029b65182c8eeed96e1f8&oe=5FEEB774"]
+	directory = r'D:\how_to_save'
+	urls = ["https://sphinx.acast.com/worstideaofalltime/friendzone114/media.mp3"]
 	for url in urls:
 		target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
-		target_resource.change_filename(rename_from_headers=True)
+		# target_resource.change_filename(rename_from_headers=True)
 		dictionary = target_resource.output_as_dictionary()
-		for element in dictionary.keys():
-			#print(element)
-			print(f"{element}:{dictionary[element]}")
+		print(dictionary)
+		# for element in dictionary.keys():
+		# 	#print(element)
+		# 	print(f"{element}:{dictionary[element]}")
 		# if 'filename_from_url' in dictionary.keys():
 		# 		target_resource.change_filename(rename_from_url = True)
 
