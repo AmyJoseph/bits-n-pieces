@@ -19,13 +19,14 @@ Function "change_filename" can be run after a resource is downloaded and a Downl
 """
 
 from datetime import datetime
-import exiftool  # req
+import exiftool
 import hashlib
 import logging
-import ntpath
 import os
+from pathlib import Path
 import re
-import requests  # req
+import requests
+import subprocess
 import time
 from urllib.parse import urlparse, urlunparse
 import uuid
@@ -369,7 +370,7 @@ class DownloadResource:
             )
             os.rename(self.filepath, new_filepath)
             self.filepath = new_filepath
-            self.filename = str(ntpath.basename(self.filepath))
+            self.filename = Path(self.filepath).name
 
     def change_filename(
         self,
