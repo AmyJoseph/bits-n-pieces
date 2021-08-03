@@ -384,9 +384,9 @@ class DownloadResource:
 			logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	def jhove_check(self):
-		print(self.filepath)
+		#print(self.filepath)
 		command = [r'jhove',self.filepath,'-t', 'text'] # the shell command
-		print(command)
+		#print(command)
 		process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 		output, error = process.communicate()
 		output = str(output).split(r"\r\n")[1:-1]
@@ -396,8 +396,8 @@ class DownloadResource:
 					self.jhove_check =  True
 
 def example():
-	directory = r'D:\how_to_save'
-	urls = ["https://sphinx.acast.com/worstideaofalltime/friendzone114/media.mp3"]
+	directory = r'Y:\ndha\pre-deposit_prod\LD_working\svetlana'
+	urls = [r"https://dl.dropboxusercontent.com/s/6d33skud10atywq/Sepia.mp4"]
 	for url in urls:
 		target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
 		# target_resource.change_filename(rename_from_headers=True)
