@@ -110,7 +110,12 @@ class DownloadResource:
 			self.get_original_size_from_headers()
 			self.get_original_md5_check_from_headers()
 			self.download_file()
+			# try:
 			self.get_file_metadata()
+			# except UnicodeDecodeError as e:
+			# 	print(str(e))
+			# 	print("!!!!!!!!!!!!!!!!!")
+
 
 		# check file extension is correct if file downloaded and not deleted by collect_html flag setting
 		if self.download_status == True:
@@ -164,10 +169,11 @@ class DownloadResource:
 		headers = {'User-Agent': user_agent}
 
 		session = requests.Session()
+		session.verify = False
 		#print("here1")
 		# set proxies for the session if needed
 		if self.proxies != None:
-						session.proxies.update(self.proxies)
+			session.proxies.update(self.proxies)
 
 		url_stripped = self.url_original.strip().rstrip("/")
 		#print("	here2")
@@ -194,16 +200,16 @@ class DownloadResource:
 			# get the thing, recording the time
 			self.datetime = datetime.now()
 			#print("here8")
-			self.r = requests.get(self.url_final, timeout=(5,14), cookies= cookies, headers=headers)
+			self.r = requests.get(self.url_final, timeout=(5,14), cookies= cookies, headers=headers, verify=False)
 
 			#print("here9")
 
-			#print(self.r.status_code)
+			print(self.r.status_code)
 			
 			self.r.raise_for_status()
 
 		except requests.exceptions.HTTPError as e:
-			#print(str(e))
+			print(str(e))
 			#print("here10")
 			self.download_status = False
 			self.message = f"HTTPError: {self.r.status_code}"
@@ -272,10 +278,11 @@ class DownloadResource:
 		"""
 
 #***	# TODO: put exiftool.exe somewhere where it doesn't need the full path
-		with exiftool.ExifTool() as et:
+		with exiftool.ExifToolHelper() as et:
+			#print(dir(et))
 			metadata = et.get_metadata(self.filepath)
 
-		#print(metadata)
+		metadata = metadata[0]
 		#print('File:FileSize' in metadata)
 		# if discarding html pages, this happens here
 		if self.collect_html == False:
@@ -297,7 +304,9 @@ class DownloadResource:
 				self.message = "{message} ; Unknown filetype"		
 		# print("'File:FileSize' in metadata")
 		if 'File:FileTypeExtension' in metadata:
+			#print("here")
 			self.filetype_extension = metadata['File:FileTypeExtension']
+			#print(self.filetype_extension)
 		else: 
 			self.filetype_extension = None
 		if 'File:MIMEType' in metadata:
@@ -383,21 +392,22 @@ class DownloadResource:
 		else:
 			logging.warning(f"Could not change filename from {self.url_original} - no file was downloaded")
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	def jhove_check(self):
-		#print(self.filepath)
-		command = [r'jhove',self.filepath,'-t', 'text'] # the shell command
-		#print(command)
-		process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-		output, error = process.communicate()
-		output = str(output).split(r"\r\n")[1:-1]
-		for el in output:
-			if 'Status' in el:
-				if "Well-Formed and valid" in el:
-					self.jhove_check =  True
+	# def jhove_check(self):
+	# 	print(self.filepath)
+	# 	command = [r'jhove',self.filepath,'-t', 'text'] # the shell command
+	# 	print(command)
+	# 	process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+	# 	output, error = process.communicate()
+	# 	output = str(output).split(r"\r\n")[1:-1]
+	# 	for el in output:
+	# 		if 'Status' in el:
+	# 			if "Well-Formed and valid" in el:
+	# 				self.jhove_check =  True
 
 def example():
-	directory = r'Y:\ndha\pre-deposit_prod\LD_working\svetlana'
-	urls = [r"https://dl.dropboxusercontent.com/s/6d33skud10atywq/Sepia.mp4"]
+	directory = r'D:\\'
+	urls = ["https://gazette.govt.nz/notice/pdf/2022-sl780"]
+	
 	for url in urls:
 		target_resource = DownloadResource(url, directory, collect_html=False, proxies=None)
 		# target_resource.change_filename(rename_from_headers=True)
