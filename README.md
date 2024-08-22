@@ -7,7 +7,7 @@ The tools for downloading and checking files.
 
    ```
 4. Add your link to download and folder where to download and run.
-5. If you get an error related with encoding you can open exiftool.py file from python/site-packages/pyexiftool folder and chage the following line:
+5. If you get an error related with encoding you can open exiftool.py file from python/site-packages/exiftool folder and chage the following line:
    ![exiftool error and solution](exiftoolfile.png)
 
  
