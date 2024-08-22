@@ -15,7 +15,7 @@ The tools for downloading and checking files.
    pip install pyexiftool
 
    ```
-4. Add your link to download and folder where to download and run as on the example:
+4. Add your link to download and folder where to download as in the example and run :
    
    ```
    def main():
