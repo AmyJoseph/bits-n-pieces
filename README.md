@@ -7,7 +7,6 @@ This tool is designed to download files from a given URL and extract metadata (l
 - **File Downloading**: Downloads files from a specified URL to a local directory.
 - **Metadata Extraction**: Extracts metadata from the downloaded file (e.g., EXIF data for images).
 - **Error Handling**: Handles errors related to downloads and metadata extraction.
-- **Cross-Platform**: Can be used on Windows, macOS, and Linux.
 
 ## Requirements
 
