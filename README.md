@@ -1,6 +1,6 @@
 # File Downloader and Metadata Extractor
 
-## Main File Downloader
+## File Downloader
 
 The primary script, `downloader.py`, is designed for downloading files from URLs and logging metadata about each download in an SQLite database. It uses **Peewee** for database interactions and **ExifTool** for metadata extraction.
 
