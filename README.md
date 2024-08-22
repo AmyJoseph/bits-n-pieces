@@ -16,8 +16,9 @@ The tools for downloading and checking files.
 
    ```
 4. Add your link to download and folder where to download and run as on the example:
+   
    ```
-def main():
+   def main():
     # Example URL of a file to download
     url = "https://example.com/image.jpg"  # Replace with the actual URL of the file
     save_directory = r"C:\Users\YourUsername\Downloads"
@@ -30,7 +31,7 @@ def main():
     if downloaded_file:
         extract_metadata(downloaded_file)
 
-if __name__ == "__main__":
+   if __name__ == "__main__":
     main()
    ```
 
