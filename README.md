@@ -1,13 +1,26 @@
-# Downloader
-## About the tool
+# File Downloader and Metadata Extractor
 
+This tool is designed to download files from a given URL and extract metadata (like EXIF data) from the downloaded files using **ExifTool**. It supports various file formats, including images, PDFs, and more. The metadata is extracted using the `pyexiftool` Python wrapper for **ExifTool**.
 
+## Features
 
+- **File Downloading**: Downloads files from a specified URL to a local directory.
+- **Metadata Extraction**: Extracts metadata from the downloaded file (e.g., EXIF data for images).
+- **Error Handling**: Handles errors related to downloads and metadata extraction.
+- **Cross-Platform**: Can be used on Windows, macOS, and Linux.
 
+## Requirements
+
+Make sure the following tools and libraries are installed:
+
+- **Python 3.x**: [Download Python](https://www.python.org/downloads/)
+- **ExifTool**: [Download ExifTool](https://exiftool.org/) (add to system's PATH)
+- **Python Libraries**:
+  - `requests` (for downloading files)
+  - `pyexiftool` (for metadata extraction)
 
 ## Installation
 
-The tools for downloading and checking files.
 1. Download [exiftools](https://exiftool.org/install.html)
 2. Add to path in environmental variables. (sysdm.cpl -->advanced-->environmental variables--> path)
 3. Install PyExifTools.
